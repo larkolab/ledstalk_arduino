@@ -11,6 +11,9 @@ boolean presence_status = false;
 boolean last_presence_status = false;
 boolean presence_init = true;
 
+// Temperature Sensor
+int temperaureSensorPin = A0;
+
 // LED
 int ledPin = 4;
 
@@ -24,15 +27,17 @@ char xivelyKey[] = "Y8bnZpN22M05lpN3qlFd26JNJKzoXCc4Ppmf7NKExv9bQecw";
 // Define the string for our datastream ID
 char messageId[] = "MESSAGE_CHANNEL";
 char presenceId[] = "PRESENCE_CHANNEL";
+char temperatureId[] = "TEMPERATURE_CHANNEL";
 String message;
 int message_length;
 
 XivelyDatastream datastreams[] = {
   XivelyDatastream(messageId, strlen(messageId), DATASTREAM_STRING),
   XivelyDatastream(presenceId, strlen(presenceId), DATASTREAM_INT),
+  XivelyDatastream(temperatureId, strlen(temperatureId), DATASTREAM_FLOAT),
 };
 // Finally, wrap the datastreams into a feed
-XivelyFeed feed(144422134, datastreams, 2 /* number of datastreams */);
+XivelyFeed feed(144422134, datastreams, 3 /* number of datastreams */);
 
 EthernetClient client;
 XivelyClient xivelyclient(client);
@@ -41,6 +46,21 @@ void MotionDetected() {
     //digitalWrite(ledPin, HIGH);
     last_motion_time = millis();
     Serial.println("--> PIR: motion detected");
+}
+
+float readTemp(){
+    // Read analog input for temperature
+    // Get value between 0 and 1024 for voltage between 0v and 5v
+    int tempValue = analogRead(temperaureSensorPin);  
+
+    // Convert value to tension
+    float temp_mV = tempValue * 5000.0 / 1024.0;  
+    Serial.println(temp_mV);
+ 
+    // Convert voltage (mV) to temperature in °C
+    float temperature = (temp_mV - 500) / 10;
+ 
+    return temperature;
 }
 
 void setup() {
@@ -83,6 +103,12 @@ void loop() {
 
   if (ret > 0)
   {
+    // Set Temperature value to Xively
+    float temperature = readTemp();
+    datastreams[2].setFloat(temperature);
+    Serial.print("temperature = "); Serial.println(temperature);
+    xivelyclient.put(feed, xivelyKey);
+    
     // Set Presence status to Xively
     if (millis() > last_motion_time + 10000)
     {
