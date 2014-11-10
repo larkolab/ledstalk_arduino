@@ -46,24 +46,59 @@ EthernetClient client;
 XivelyClient xivelyclient(client);
 
 void MotionDetected() {
-    //digitalWrite(ledPin, HIGH);
-    last_motion_time = millis();
-    Serial.println("--> PIR: motion detected");
+  //digitalWrite(ledPin, HIGH);
+  last_motion_time = millis();
+  Serial.println("--> PIR: motion detected");
+}
+
+// Get volatge reference for more accurate temp measures
+// https://code.google.com/p/tinkerit/wiki/SecretVoltmeter
+// TODO: check again if we can get better accuracy
+long readVcc() {
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+#if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  ADMUX = _BV(REFS0) | _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+#elif defined (__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
+  ADMUX = _BV(MUX5) | _BV(MUX0) ;
+#else
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+#endif  
+ 
+  delay(2); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Start conversion
+  while (bit_is_set(ADCSRA,ADSC)); // measuring
+ 
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+  uint8_t high = ADCH; // unlocks both
+ 
+  long result = (high<<8) | low;
+ 
+  // scale_constant = internal1.1Ref * 1023 * 1000
+  // where
+  // internal1.1Ref = 1.1 * Vcc1 (per voltmeter) / Vcc2 (per readVcc() function)
+  // theory: 1125300L = 1.1*1023*1000
+  result = 1118040L / result; // Calculate Vcc (in mV);
+  
+  return result; // Vcc in millivolts
 }
 
 float readTemp(){
-    // Read analog input for temperature
-    // Get value between 0 and 1024 for voltage between 0v and 5v
-    int tempValue = analogRead(temperaureSensorPin);  
+  long Vcc;
+  
+  // Read analog input for temperature
+  // Get value between 0 and 1024 for voltage between 0v and 5v
+  int tempValue = analogRead(temperaureSensorPin);  
 
-    // Convert value to tension
-    float temp_mV = tempValue * 4630.0 / 1024.0;  
-    Serial.println(temp_mV);
+  // Convert value to tension
+  Vcc = readVcc();
+  float temp_mV = tempValue * Vcc / 1023.0;  
+  Serial.print("Vcc="); Serial.println(Vcc);
  
-    // Convert voltage (mV) to temperature in °C
-    float temperature = (temp_mV - 500) / 10;
+  // Convert voltage (mV) to temperature in °C
+  float temperature = (temp_mV - 500) / 10;
  
-    return temperature;
+  return temperature;
 }
 
 void setup() {
