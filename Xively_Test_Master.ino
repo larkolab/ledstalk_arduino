@@ -11,6 +11,9 @@ boolean presence_status = false;
 boolean last_presence_status = false;
 boolean presence_init = true;
 
+float last_temperature = 0.0;
+boolean temperature_init = false;
+
 // Temperature Sensor
 int temperaureSensorPin = A0;
 
@@ -54,7 +57,7 @@ float readTemp(){
     int tempValue = analogRead(temperaureSensorPin);  
 
     // Convert value to tension
-    float temp_mV = tempValue * 5000.0 / 1024.0;  
+    float temp_mV = tempValue * 4630.0 / 1024.0;  
     Serial.println(temp_mV);
  
     // Convert voltage (mV) to temperature in °C
@@ -107,7 +110,12 @@ void loop() {
     float temperature = readTemp();
     datastreams[2].setFloat(temperature);
     Serial.print("temperature = "); Serial.println(temperature);
-    xivelyclient.put(feed, xivelyKey);
+    if (!temperature_init || (abs(last_temperature - temperature) >= 0.5)) {
+      Serial.println("--> update temperature on Xively");
+      xivelyclient.put(feed, xivelyKey);
+      temperature_init = true;
+      last_temperature = temperature;
+    }
     
     // Set Presence status to Xively
     if (millis() > last_motion_time + 10000)
@@ -140,5 +148,5 @@ void loop() {
     Wire.endTransmission();    // stop transmitting    
   }
 
-  delay(1000UL);
+  delay(10000UL);
 }
